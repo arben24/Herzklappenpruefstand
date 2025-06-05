@@ -44,6 +44,14 @@ while True:
             continue
         print(raw)
 
+        if raw == "Setup start":
+            print("Setup gestartet...")
+            while raw != "Setup end":
+                raw = ser.readline().decode('utf-8').strip()
+                if not raw:
+                    continue
+                print(raw)
+
         if raw == "Kennlinienaufnahme gestartet.":
             print("Kennlinienaufnahme gestartet...")
             aufzeichnung_aktiv = True

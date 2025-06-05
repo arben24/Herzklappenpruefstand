@@ -19,6 +19,8 @@ const float VOLTAGE_OFFSET = 0.18f;
 // Sensitivität pro Kanal (in Volt pro kPa)
 //const float SENSOR_SENSITIVITY[4] = {0.45f, 0.50f, 0.40f, 0.55f}; // Beispielwerte für 4 Kanäle
 const float predefinedVelocity[8] = {-1.0f,-2.0f, -3.0f, -5.0f, -6.0f, -8.0f, -10.0f, -12.0f}; // Beispielwerte für die Geschwindigkeit
+int time_for_sensor_recording = 20; // Zeit in ms 
+
 
 unsigned long prevMotorMillis = 0;
 
@@ -81,6 +83,37 @@ if (print)
 }
 }
 
+
+void readAndAverageSensorValuesOverTime(int time_ms, float averagedVoltages[4],bool print = false) {
+  float voltageSums[4] = {0, 0, 0, 0};
+
+  int numSamples = 0;
+  unsigned long startMillis = millis();
+  while (millis() - startMillis < time_ms){
+    for (int channel = 0; channel < 4; channel++) {
+        int16_t adcValue = ads.readADC_SingleEnded(channel);
+        float voltage = ads.computeVolts(adcValue);
+        voltageSums[channel] += voltage;
+      }
+    if (isSpeedMode){
+      updateMotor();
+    }
+    numSamples++;
+  }
+
+  for (int channel = 0; channel < 4; channel++) {
+    averagedVoltages[channel] = voltageSums[channel] / numSamples;
+    if (print){
+      Serial.print("Kanal ");
+      Serial.print(channel);
+      Serial.print(": ");
+      Serial.print(averagedVoltages[channel], 4);
+      Serial.print(" V");
+      Serial.println(" ");
+    }
+  }
+}
+
 // Funktion für die Kennlinienaufnahme
 void recordCurve() {
   static unsigned long prevRecordMillis = 0;
@@ -99,20 +132,17 @@ void recordCurve() {
     while (millis() - startTime < 3000) {
       updateMotor();
     }
-    //Serial.print("Motor-Geschwindigkeit: ");
-    //Serial.println(motorSpeed, 4);
+
     unsigned long measureTime = millis();
     float averagedVoltages[4];
-    // while (millis() - measureTime < 3000) {
-    //   updateMotor();
-    //   readAndAverageSensorValues(10, averagedVoltages,true); // 10 Werte mitteln
-    // }
 
-    readAndAverageSensorValues(40, averagedVoltages,false);
+    readAndAverageSensorValuesOverTime(time_for_sensor_recording, averagedVoltages,false);
+
     unsigned long stableTime = millis();
     while (millis() - stableTime < 3000) {
       updateMotor();
     }
+
     for (int channel = 0; channel < 4; channel++) {
       Serial.print(averagedVoltages[channel], 4);
       Serial.print(",");
@@ -131,7 +161,7 @@ void recordCurve() {
 void setup() {
   Serial.begin(115200);
   while (!Serial) { delay(10); }
-  Serial.println("Starte Serial Monitor Steuerung");
+  Serial.println("Setup start");
 
   // ADS1015 initialisieren
   if (!ads.begin()) {
@@ -167,6 +197,8 @@ void setup() {
   Serial.println("  motor speed X    -- setzt die Motor-Geschwindigkeit (rad/s)");
   Serial.println("  motor record     -- startet die Kennlinienaufnahme");
   Serial.println("  motor idle       -- versetzt den Motor in den Idle-Modus");
+
+  Serial.println("Setup end");
 }
 
 void processSerialCommands() {
@@ -185,6 +217,15 @@ void processSerialCommands() {
       Serial.print("Motorposition auf ");
       Serial.print(position, 4);
       Serial.println(" rad gesetzt");
+    }
+    if (cmd.startsWith("set time ")) {
+      // Beispiel: "motor pos 90" (Grad)
+      String timeStr = cmd.substring(9);  // Nach "motor pos "
+      int timeint = timeStr.toInt();
+      time_for_sensor_recording = timeint ;     // Grad in Bogenmaß
+      Serial.print("Sensor Time auf ");
+      Serial.print(time_for_sensor_recording);
+      Serial.println(" ms gesetzt");
     }
     else if (cmd.startsWith("motor speed ")) {
       // Beispiel: "motor speed 0.5" (rad/s)
