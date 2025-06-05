@@ -18,7 +18,8 @@ const float VOLTAGE_OFFSET = 0.18f;
 
 // Sensitivität pro Kanal (in Volt pro kPa)
 //const float SENSOR_SENSITIVITY[4] = {0.45f, 0.50f, 0.40f, 0.55f}; // Beispielwerte für 4 Kanäle
-const float predefinedVelocity[8] = {-1.0f,-2.0f, -3.0f, -5.0f, -6.0f, -8.0f, -10.0f, -12.0f}; // Beispielwerte für die Geschwindigkeit
+const float predefinedVelocity[3] = {-1.0f, -5.0f, -10.0f}; // Beispielwerte für die Geschwindigkeit
+//const float predefinedVelocity[8] = {-1.0f,-2.0f, -3.0f, -5.0f, -6.0f, -8.0f, -10.0f, -12.0f}; // Beispielwerte für die Geschwindigkeit
 int time_for_sensor_recording = 20; // Zeit in ms 
 
 
