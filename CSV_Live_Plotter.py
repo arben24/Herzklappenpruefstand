@@ -224,8 +224,7 @@ except KeyboardInterrupt:
     ser.close()
     exit()
 
-# ------------------------------------------------------------------------
-# Nach der Aufnahme: CSV-Daten plotten (nur Bar-Werte, gruppiert nach Run)
+# ------------------ PLOTTING DER MESSDATEN ------------------
 runs = collections.defaultdict(lambda: {"flow": [], "abs_bar": [], "diff_bar": [], "diff_air_bar": []})
 
 with open(csv_path, 'r') as f:
