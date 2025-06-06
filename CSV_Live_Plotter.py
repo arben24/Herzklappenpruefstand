@@ -225,6 +225,7 @@ except KeyboardInterrupt:
     exit()
 
 # ------------------ PLOTTING DER MESSDATEN ------------------
+#every run is a separate line in the plot
 runs = collections.defaultdict(lambda: {"flow": [], "abs_bar": [], "diff_bar": [], "diff_air_bar": []})
 
 with open(csv_path, 'r') as f:
