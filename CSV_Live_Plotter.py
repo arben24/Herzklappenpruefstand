@@ -5,6 +5,7 @@ import os
 import json
 from datetime import datetime
 from time import sleep
+import collections
 
 # ------------------ BENUTZEREINGABEN UND KONFIGURATION ------------------
 
@@ -29,6 +30,11 @@ while True:
         break
     except ValueError:
         print("Ungültige Eingabe. Bitte eine ganze Zahl eingeben.")
+
+
+kalibrieren = input("Soll eine Offset-Kalibrierung durchgeführt werden? (j/n): ").strip().lower() == "j"
+
+
 
 # Sensitivitäten [V/bar oder V/(l/min)] und Offsetwerte [V] – je Kanal
 # (diese Werte werden in der Config-Datei mitgespeichert)
@@ -55,17 +61,6 @@ os.makedirs(folder_name, exist_ok=True)
 config_path = os.path.join(folder_name, "config.json")
 csv_path = os.path.join(folder_name, "messdaten.csv")
 
-# Config-Dictionary zusammenstellen und in JSON-Datei schreiben
-config_data = {
-    "flap_name": flap_name,
-    "time_ms": time_ms,
-    "num_runs": num_runs,
-    "sensitivity": sensitivity,
-    "offsets": offsets
-}
-
-with open(config_path, 'w', encoding='utf-8') as cfg_file:
-    json.dump(config_data, cfg_file, indent=4)
 
 print(f"Konfigurationsdatei geschrieben nach: {config_path}")
 print(f"Messdaten werden gespeichert in: {csv_path}")
@@ -84,6 +79,53 @@ with open(csv_path, 'w', newline='') as f:
 
 # Serielle Schnittstelle öffnen
 ser = serial.Serial(PORT, BAUDRATE, timeout=1)
+
+if kalibrieren:
+    print("Starte Kalibrierung...")
+    ser.write(b"starte kalibrierung\n")
+    offsets = {}
+    for _ in range(4):
+        line = ser.readline().decode('utf-8').strip()
+        # Erwartetes Format: "Kanal X: Y.YYYY V"
+        if line.startswith("Kanal"):
+            try:
+                parts = line.split(":")
+                kanal = int(parts[0].split()[1])
+                wert = float(parts[1].replace("V", "").strip())
+                # Mapping wie im offsets-Original
+                if kanal == 0:
+                    offsets["p_diff_air"] = wert
+                elif kanal == 1:
+                    offsets["p_abs"] = wert
+                elif kanal == 2:
+                    offsets["p_diff"] = wert
+                elif kanal == 3:
+                    offsets["flow"] = wert
+                print(f"Offset Kanal {kanal}: {wert} V")
+            except Exception as e:
+                print("Fehler beim Einlesen der Kalibrierung:", line, e)
+    print("Offset-Kalibrierung abgeschlossen.")
+else:
+    # Standard-Offsets
+    offsets = {
+        "p_diff_air": 0.41,
+        "p_abs": 0.78,
+        "p_diff": 0.78,
+        "flow": 0.7
+    }
+
+
+# Config-Dictionary zusammenstellen und in JSON-Datei schreiben
+config_data = {
+    "flap_name": flap_name,
+    "time_ms": time_ms,
+    "num_runs": num_runs,
+    "sensitivity": sensitivity,
+    "offsets": offsets
+}
+
+with open(config_path, 'w', encoding='utf-8') as cfg_file:
+    json.dump(config_data, cfg_file, indent=4)
 
 # Messzeit per seriellem Befehl an den Mikrocontroller senden
 set_time_cmd = f"set time {time_ms}\n".encode('utf-8')
@@ -183,33 +225,33 @@ except KeyboardInterrupt:
     exit()
 
 # ------------------------------------------------------------------------
-# Nach der Aufnahme: CSV-Daten plotten (nur Bar-Werte)
-flow_list = []
-abs_bar_list = []
-diff_bar_list = []
-diff_air_bar_list = []
+# Nach der Aufnahme: CSV-Daten plotten (nur Bar-Werte, gruppiert nach Run)
+runs = collections.defaultdict(lambda: {"flow": [], "abs_bar": [], "diff_bar": [], "diff_air_bar": []})
 
 with open(csv_path, 'r') as f:
     reader = csv.DictReader(f)
     for row in reader:
         try:
-            flow_list.append(float(row['Flow (L/min)']))
-            abs_bar_list.append(float(row['Absolutdruck (bar)']))
-            diff_bar_list.append(float(row['Differenzdruck (bar)']))
-            diff_air_bar_list.append(float(row['Differenzdruck_klein (bar)']))
+            run_idx = int(row['Run'])
+            runs[run_idx]["flow"].append(float(row['Flow (L/min)']))
+            runs[run_idx]["abs_bar"].append(float(row['Absolutdruck (bar)']))
+            runs[run_idx]["diff_bar"].append(float(row['Differenzdruck (bar)']))
+            runs[run_idx]["diff_air_bar"].append(float(row['Differenzdruck_klein (bar)']))
         except ValueError:
             continue
 
-if flow_list:
+if runs:
     plt.figure()
-    plt.plot(flow_list, abs_bar_list, label="Absolutdruck (bar)")
-    plt.plot(flow_list, diff_bar_list, label="Differenzdruck (bar)")
-    plt.plot(flow_list, diff_air_bar_list, label="Differenzdruck klein (bar)")
+    colors = plt.cm.get_cmap('tab10', len(runs))
+    for idx, (run_idx, data) in enumerate(sorted(runs.items())):
+        plt.plot(data["flow"], data["abs_bar"], label=f"Absolutdruck Run {run_idx}", color=colors(idx), linestyle='-')
+        plt.plot(data["flow"], data["diff_bar"], label=f"Differenzdruck Run {run_idx}", color=colors(idx), linestyle='--')
+        plt.plot(data["flow"], data["diff_air_bar"], label=f"Diff.klein Run {run_idx}", color=colors(idx), linestyle=':')
     plt.xlabel("Flow (L/min)")
     plt.ylabel("Druck (bar)")
     plt.title(f"Kennlinienaufnahme für '{flap_name}' ({num_runs} Runs)")
     plt.grid(True)
-    plt.legend()
+    plt.legend(fontsize='small', ncol=2)
     plt.tight_layout()
     plt.show()
 else:

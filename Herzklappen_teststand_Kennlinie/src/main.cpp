@@ -18,9 +18,11 @@ const float VOLTAGE_OFFSET = 0.18f;
 
 // Sensitivität pro Kanal (in Volt pro kPa)
 //const float SENSOR_SENSITIVITY[4] = {0.45f, 0.50f, 0.40f, 0.55f}; // Beispielwerte für 4 Kanäle
-const float predefinedVelocity[3] = {-1.0f, -5.0f, -10.0f}; // Beispielwerte für die Geschwindigkeit
-//const float predefinedVelocity[8] = {-1.0f,-2.0f, -3.0f, -5.0f, -6.0f, -8.0f, -10.0f, -12.0f}; // Beispielwerte für die Geschwindigkeit
+//const float predefinedVelocity[3] = {-1.0f, -5.0f, -10.0f}; // Beispielwerte für die Geschwindigkeit
+const float predefinedVelocity[8] = {-1.0f,-2.0f, -3.0f, -5.0f, -6.0f, -8.0f, -10.0f, -12.0f}; // Beispielwerte für die Geschwindigkeit
 int time_for_sensor_recording = 20; // Zeit in ms 
+
+
 
 
 unsigned long prevMotorMillis = 0;
@@ -112,6 +114,22 @@ void readAndAverageSensorValuesOverTime(int time_ms, float averagedVoltages[4],b
       Serial.print(" V");
       Serial.println(" ");
     }
+  }
+}
+
+void kalibrierung(){
+
+  // Kalibrierung der Sensoren
+  float averagedVoltages[4];
+  readAndAverageSensorValues(10, averagedVoltages,true); // 10 Werte mitteln
+
+  //Serial.println("Kalibrierung abgeschlossen. Gemessene Spannungen:");
+  for (int channel = 0; channel < 4; channel++) {
+    Serial.print("Kanal ");
+    Serial.print(channel);
+    Serial.print(": ");
+    Serial.print(averagedVoltages[channel], 4);
+    Serial.println(" V");
   }
 }
 
@@ -244,6 +262,9 @@ void processSerialCommands() {
       Serial.println(" rad/s gesetzt");
       Serial.print("Aktuelle Motorposition synchronisiert: ");
       Serial.println(position, 4);
+    }
+    else if (cmd.equalsIgnoreCase("starte kalibrierung")) {
+      kalibrierung();
     }
     else if (cmd.equalsIgnoreCase("motor record")) {
       odrive.setState(AXIS_STATE_CLOSED_LOOP_CONTROL);
