@@ -7,6 +7,7 @@ from datetime import datetime
 from time import sleep
 import collections
 import numpy as np
+import dearpygui.dearpygui as dpg
 
 # ------------------ BENUTZEREINGABEN UND KONFIGURATION ------------------
 
@@ -353,6 +354,10 @@ with open(csv_path, 'r') as f:
             runs[i]["diff_air_upper"].append(float(row['p_diff_air_upper (bar)']))
         except ValueError:
             continue
+
+
+
+
 
 
 plt.figure()
